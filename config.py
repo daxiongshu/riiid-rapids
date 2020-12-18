@@ -1,0 +1,5 @@
+PATH = '../../data'
+DEVICE = 'DGX-S'
+BACKUP = './backup'
+LOG = 'run.log'
+INFO = 'basic'
