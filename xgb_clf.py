@@ -53,7 +53,8 @@ class XGBbase:
     def predict(self, X):
         self.clf.set_param({'predictor': 'gpu_predictor'})
         dtest = xgb.DMatrix(data=X)
-        yp = self.clf.predict(dtest)
+        best_iteration = self.clf.best_ntree_limit
+        yp = self.clf.predict(dtest, ntree_limit=best_iteration)
         yp = cp.asarray(yp)
         return yp
     

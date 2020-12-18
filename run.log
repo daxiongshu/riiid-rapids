@@ -1,2 +1,26 @@
 run_name,duration,score,info
 2020-12-18-10-17-22-DGX-S,71.0,0.7322,basic
+2020-12-18-10-48-13-DGX-S,76.6,0.7309,RE-SPLIT xgb.py add question
+2020-12-18-10-50-02-DGX-S,55.8,0.7296,xgb.py remove question
+2020-12-18-10-52-42-DGX-S,70.9,0.7307,xgb.py add question remove feature correct_answer
+2020-12-18-10-54-43-DGX-S,68.0,0.7302,xgb.py add question remove feature part
+2020-12-18-10-57-02-DGX-S,57.5,0.7306,xgb.py depth=7
+2020-12-18-11-00-56-DGX-S,46.9,0.7338,xgb.py colsample_bytree=0.5
+2020-12-18-11-02-36-DGX-S,39.4,0.7331,xgb.py colsample_bytree=0.7
+2020-12-18-11-03-46-DGX-S,45.6,0.7323,xgb.py colsample_bytree=0.3
+2020-12-18-11-05-18-DGX-S,41.0,0.7332,xgb.py colsample_bytree=0.5 depth=7
+2020-12-18-11-07-46-DGX-S,40.6,0.7344,PREDICT BEST ITER xgb.py colsample_bytree=0.5 depth=7
+2020-12-18-11-10-11-DGX-S,44.1,0.7332,xgb.py question tags byte_count
+2020-12-18-11-13-39-DGX-S,38.8,0.7329,xgb.py colsample_bytree=0.5 depth=5
+2020-12-18-11-15-26-DGX-S,45.5,0.7384,xgb.py fold 1
+2020-12-18-11-17-10-DGX-S,75.9,0.7372,xgb.py fold 1
+2020-12-18-11-19-58-DGX-S,40.8,0.7351,RE-SPLIT xgb.py 
+2020-12-18-11-22-33-DGX-S,76.8,0.7328,xgb.py depth=10 cols=1
+2020-12-18-11-24-56-DGX-S,25.9,0.7346,xgb.py remove question
+2020-12-18-11-27-08-DGX-S,38.9,0.7352,xgb.py depth=7 cols=0.5 subs=0.5
+2020-12-18-11-28-23-DGX-S,40.1,0.7351,xgb.py depth=7 cols=0.5 subs=0.7
+2020-12-18-11-30-26-DGX-S,39.4,0.7351,xgb.py depth=7 cols=0.5 subs=0.5
+2020-12-18-11-32-10-DGX-S,28.1,0.7344,xgb.py remove timestamp
+2020-12-18-11-33-46-DGX-S,28.6,0.7334,xgb.py remove prior_question_had_explanation
+2020-12-18-11-35-45-DGX-S,29.9,0.7287,xgb.py depth=5 cols=0.5 subs=0.5
+2020-12-18-11-49-07-DGX-S,39.8,0.7351,xgb.py depth=7 cols=0.5 subs=0.5

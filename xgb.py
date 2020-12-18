@@ -29,19 +29,34 @@ def get_x_y(df):
     y = df['answered_correctly'].values.astype('float32')
     df = df.drop(['row_id', 'answered_correctly'], axis=1)
 
+    print(df.columns)
     X = df.values.astype('float32')
     X = cp.ascontiguousarray(X)
     return X, y, df
 
+def merge_question(df, dq):
+    df = df.merge(dq, left_on='content_id', right_on='question_id', how='left')
+    df = df.drop('question_id', axis=1)
+    return df
+
 def xgb(path):
-    FOLD = 0
+    FOLD = 1 
     train = gd.read_parquet(f'{path}/cache/train_{FOLD}.parquet')
     valid = gd.read_parquet(f'{path}/cache/valid_{FOLD}.parquet')
+
+    dq = gd.read_csv(f'{path}/questions.csv')
+    dq = dq.drop(['tags'], axis=1)
+    #dq['tags'] = dq['tags'].str.byte_count()
+
+    train = merge_question(train, dq)
+    valid = merge_question(valid, dq)
+    del dq
 
     train = clean(train)
     valid = clean(valid)
 
     id_cols = [i for i in train.columns if i.endswith('_id') and i!='row_id']
+    print('id_cols', id_cols)
     tgt = {}
 
     for i in tqdm(id_cols):
@@ -53,7 +68,9 @@ def xgb(path):
 
     params = {'n_estimators': 100,
               'eta': 0.1,
-              'max_depth': 10,
+              'max_depth': 7, 
+              'colsample_bytree': 0.5,
+              'subsample': 0.5,
               'verbosity': 1,
               'objective': 'binary:logistic',
               'eval_metric': 'auc',

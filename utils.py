@@ -4,14 +4,14 @@ from time import time
 from config import DEVICE, BACKUP, LOG, INFO
 
 
-def backup(duration, score):
+def backup(filename, duration, score):
     name = make_name()
     bpath = f"{BACKUP}/{name}"
     if os.path.exists(bpath):
         msg = f"{bpath} already exists. Please manually backup."
         return
     mkdir(bpath)
-    write_log(LOG, name, duration, score, INFO)
+    write_log(LOG, name, duration, score, f"{filename} {INFO}")
     cmd = f"cp *.py run.sh run.log {bpath}/"
     os.system(cmd)
     print(f"{bpath} backup done")
@@ -46,5 +46,5 @@ def run(filename, do_backup, func, *args):
     score = func(*args)
     duration = time() - start
     if do_backup and score is not None:
-        backup(duration, score)
+        backup(filename, duration, score)
     print(f'{tag} done! Time:{duration: .1f} seconds')
