@@ -24,3 +24,4 @@ run_name,duration,score,info
 2020-12-18-11-33-46-DGX-S,28.6,0.7334,xgb.py remove prior_question_had_explanation
 2020-12-18-11-35-45-DGX-S,29.9,0.7287,xgb.py depth=5 cols=0.5 subs=0.5
 2020-12-18-11-49-07-DGX-S,39.8,0.7351,xgb.py depth=7 cols=0.5 subs=0.5
+2020-12-18-16-38-04-DGX-S,40.8,0.7365,BACK TO FOLD0 xgb.py depth=7 cols=0.5 subs=0.5

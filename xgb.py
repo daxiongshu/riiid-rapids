@@ -40,7 +40,7 @@ def merge_question(df, dq):
     return df
 
 def xgb(path):
-    FOLD = 1 
+    FOLD = 0 
     train = gd.read_parquet(f'{path}/cache/train_{FOLD}.parquet')
     valid = gd.read_parquet(f'{path}/cache/valid_{FOLD}.parquet')
 
