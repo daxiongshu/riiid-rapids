@@ -25,3 +25,20 @@ run_name,duration,score,info
 2020-12-18-11-35-45-DGX-S,29.9,0.7287,xgb.py depth=5 cols=0.5 subs=0.5
 2020-12-18-11-49-07-DGX-S,39.8,0.7351,xgb.py depth=7 cols=0.5 subs=0.5
 2020-12-18-16-38-04-DGX-S,40.8,0.7365,BACK TO FOLD0 xgb.py depth=7 cols=0.5 subs=0.5
+2020-12-21-03-17-36-DGX-S,43.6,0.7365,xgb.py remove question
+2020-12-21-03-18-50-DGX-S,23.2,0.7358,xgb.py lr=0.05
+2020-12-21-03-21-07-DGX-S,26.2,0.7365,xgb.py lr=0.1 stopping rounds=20 
+2020-12-21-04-10-18-DGX-S,98.3,0.7361,xgb.py refactor fe
+2020-12-21-04-13-09-DGX-S,98.4,0.7361,xgb.py refactor fe
+2020-12-21-04-23-54-DGX-S,112.6,0.7373,xgb.py add count encoding 
+2020-12-21-04-32-50-DGX-S,53.7,0.7371,xgb.py refactor fe load pandas 10GB
+2020-12-21-04-33-42-DGX-S,38.3,0.7372,xgb.py refactor fe load cudf 27GB
+2020-12-21-04-36-41-DGX-S,38.3,0.7372,xgb.py refactor fe
+2020-12-21-04-40-03-DGX-S,113.8,0.7369,xgb.py subs=0.8
+2020-12-21-04-49-38-DGX-S,126.1,0.7296,xgb.py depth=10 cols=1 subs=1
+2020-12-21-04-59-07-DGX-S,110.0,0.7373,xgb.py subs=0.5
+2020-12-21-05-01-51-DGX-S,113.9,0.7359,xgb.py subs=0.5 lr=0.03
+2020-12-21-05-14-27-DGX-S,110.8,0.7373,xgb.py subs=0.5
+2020-12-21-05-33-31-DGX-S,110.0,0.7368,xgb.py 
+2020-12-21-05-37-40-DGX-S,97.7,0.7361,xgb.py 
+2020-12-21-05-43-46-DGX-S,109.7,0.7368,xgb.py 

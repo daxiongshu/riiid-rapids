@@ -1,74 +1,42 @@
-import cudf as gd
-import os
-import random
-import numba
 import cupy as cp
+import pandas as pd
 from xgb_clf import XGBClassifier
-from cuml.preprocessing import TargetEncoder
-from tqdm import tqdm
-from cuml.preprocessing.model_selection import train_test_split 
 from cuml.metrics import roc_auc_score
 from config import PATH
 from utils import run
+from fe import run_fe, get_target, count_encode, target_encode, get_default_feas
 
-def clean(df):
-    cols = ['viretual_time_stamp', 'user_answer']
-    df = df.drop(cols, axis=1)
-
-    mask = df['content_type_id'] == 0
-    df = df[mask]
-    df = df.drop('content_type_id', axis=1)
-    
-    for i in df.columns:
-        if i == 'prior_question_had_explanation':
-            df[i] = df[i].astype('float32')
-        df[i] = df[i].fillna(-999) 
-    return df
 
 def get_x_y(df):
     y = df['answered_correctly'].values.astype('float32')
-    df = df.drop(['row_id', 'answered_correctly'], axis=1)
+    df = df.drop(['answered_correctly'], axis=1)
 
     print(df.columns)
     X = df.values.astype('float32')
-    X = cp.ascontiguousarray(X)
-    return X, y, df
+    cols = [i for i in df.columns]
+    #X = cp.ascontiguousarray(X)
+    return X, y, df, cols
 
-def merge_question(df, dq):
-    df = df.merge(dq, left_on='content_id', right_on='question_id', how='left')
-    df = df.drop('question_id', axis=1)
-    return df
 
 def xgb(path):
     FOLD = 0 
-    train = gd.read_parquet(f'{path}/cache/train_{FOLD}.parquet')
-    valid = gd.read_parquet(f'{path}/cache/valid_{FOLD}.parquet')
-
-    dq = gd.read_csv(f'{path}/questions.csv')
-    dq = dq.drop(['tags'], axis=1)
-    #dq['tags'] = dq['tags'].str.byte_count()
-
-    train = merge_question(train, dq)
-    valid = merge_question(valid, dq)
-    del dq
-
-    train = clean(train)
-    valid = clean(valid)
-
-    id_cols = [i for i in train.columns if i.endswith('_id') and i!='row_id']
-    print('id_cols', id_cols)
-    tgt = {}
-
-    for i in tqdm(id_cols):
-        encoder = TargetEncoder()
-        train[i] = encoder.fit_transform(train[i], train['answered_correctly'])
-        valid[i] = encoder.transform(valid[i])
-        tgt[i] = encoder.encode_all.drop(['__TARGET___x', '__TARGET___y'], axis=1)
-        del encoder
+    
+    train1,valid1 = run_fe(get_default_feas, path, 'default', FOLD)
+    train2,valid2 = run_fe(target_encode, path, 'tgt', FOLD)
+    train3,valid3 = run_fe(get_target, path, 'y', FOLD)
+    train4,valid4 = run_fe(count_encode, path, 'count_encode', FOLD)
+    
+    train = pd.concat([train1, train2, train3, 
+        train4
+        ], axis=1)
+    valid = pd.concat([valid1, valid2, valid3, 
+        valid4
+        ], axis=1)
 
     params = {'n_estimators': 100,
               'eta': 0.1,
-              'max_depth': 7, 
+              'early_stopping_rounds': 10,
+              'max_depth': 5, 
               'colsample_bytree': 0.5,
               'subsample': 0.5,
               'verbosity': 1,
@@ -81,20 +49,17 @@ def xgb(path):
 
 
     print('X, y = get_x_y(train)')
-    X, y, train = get_x_y(train)
+    X, y, train, cols = get_x_y(train)
     del train
     print('Xt, yt = get_x_y(valid)')
-    Xt, yt, valid = get_x_y(valid)
+    Xt, yt, valid, cols = get_x_y(valid)
     del valid
 
     clf.fit(X, y, Xt, yt)
     clf.clf.save_model(f'{path}/cache/xgb.json')
 
-    for i in tgt:
-        tgt[i].to_parquet(f'{path}/cache/tgt_{i}.parquet')
-
-
     yp = clf.predict_proba(Xt)
+    print(cols)
     return roc_auc_score(yt, yp)
 
 if __name__ == '__main__':
