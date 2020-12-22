@@ -33,7 +33,7 @@ def xgb(path):
         valid4
         ], axis=1)
 
-    params = {'n_estimators': 100,
+    params = {'n_estimators': 1000,
               'eta': 0.1,
               'early_stopping_rounds': 10,
               'max_depth': 5, 

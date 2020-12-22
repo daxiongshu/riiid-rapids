@@ -2,16 +2,13 @@ import cudf as gd
 import pandas as pd
 import os
 import random
-import numba
+from numba import cuda
 from time import time
 import cupy as cp
 from xgb_clf import XGBClassifier
 from cuml.preprocessing import TargetEncoder
 from tqdm import tqdm
-from cuml.preprocessing.model_selection import train_test_split 
-from cuml.metrics import roc_auc_score
 from config import PATH
-from utils import run
 
 def clean(df):
     cols = ['viretual_time_stamp', 'user_answer']
@@ -49,7 +46,34 @@ def get_train_valid(path, FOLD):
     train = clean(train)
     valid = clean(valid)
     
-    return train,valid
+    # get most recent samples globally
+    
+    N = valid.shape[0]
+    base = train[:-N]
+    train = train[-N:]
+    print(base.shape, train.shape, valid.shape)
+    
+    
+    # get per user most recent 
+    """
+    def get_order_in_group(user_id, order):
+        N = len(user_id)
+        for i in range(cuda.threadIdx.x, len(user_id), cuda.blockDim.x):
+            order[i] = i - N
+
+    train = train.groupby('user_id', 
+                          as_index=False).apply_grouped(get_order_in_group,incols=['user_id'],
+                                  outcols={'order': 'int32'},
+                                  tpb=32)
+    mask = train['order']>-200
+    base = train[~mask]
+    train = train[mask]
+    base = base.drop('order', axis=1)
+    train = train.drop('order', axis=1)
+    print(base.shape, train.shape, valid.shape)
+    train = train.sort_values('idx')
+    """
+    return base,train,valid
 
 def get_sorted_df(df, cols):
     df = df[cols+['idx']]
@@ -58,9 +82,10 @@ def get_sorted_df(df, cols):
 
 def get_default_feas(path, tag, FOLD):
     
-    train,valid = get_train_valid(path, FOLD)
+    _,train,valid = get_train_valid(path, FOLD)
     ycol = 'answered_correctly'
     cols = [i for i in train.columns if not i.endswith('_id') and i!=ycol]
+    #cols = [i for i in train.columns if  i!=ycol]
     print(cols)
     
     train = get_sorted_df(train, cols)
@@ -69,7 +94,7 @@ def get_default_feas(path, tag, FOLD):
 
 def count_encode(path, tag, FOLD):
     
-    train,valid = get_train_valid(path, FOLD)
+    base,train,valid = get_train_valid(path, FOLD)
     
     ycol = 'answered_correctly'
     id_cols = [i for i in train.columns if i.endswith('_id') and i!='row_id']
@@ -77,7 +102,7 @@ def count_encode(path, tag, FOLD):
     tgt = {}
 
     for i in tqdm(id_cols):
-        dg = train.groupby(i).agg({ycol:'count'})
+        dg = base.groupby(i).agg({ycol:'count'})
         dg = dg.reset_index()
         dg.columns = [i, f'count_{i}']
         train = train.merge(dg, on=i, how='left')
@@ -92,31 +117,30 @@ def count_encode(path, tag, FOLD):
 
 def target_encode(path, tag, FOLD):
     
-    train,valid = get_train_valid(path, FOLD)
+    base,train,valid = get_train_valid(path, FOLD)
     
     ycol = 'answered_correctly'
     id_cols = [i for i in train.columns if i.endswith('_id') and i!='row_id']
     print('id_cols', id_cols)
-    tgt = {}
-
-    for i in tqdm(id_cols):
-        encoder = TargetEncoder()
-        train[i] = encoder.fit_transform(train[i], train['answered_correctly'])
-        valid[i] = encoder.transform(valid[i])
-        tgt[i] = encoder.encode_all.drop(['__TARGET___x', '__TARGET___y'], axis=1)
-        del encoder
-        
-    train = get_sorted_df(train, id_cols)
-    valid = get_sorted_df(valid, id_cols)
     
-    for i in tgt:
-        tgt[i].to_parquet(f'{path}/cache/tgt_{i}_{FOLD}.parquet')
+    out_cols = []
+    for i in tqdm(id_cols):
+        dg = base.groupby(i).agg({ycol:'mean'})
+        dg = dg.reset_index()
+        dg.columns = [i, f'tgt_{i}']
+        train = train.merge(dg, on=i, how='left')
+        valid = valid.merge(dg, on=i, how='left')
+        dg.to_parquet(f'{path}/cache/tgt_{i}_{FOLD}.parquet')
+        out_cols.append(f'tgt_{i}')
+    
+    train = get_sorted_df(train, out_cols)
+    valid = get_sorted_df(valid, out_cols)
     
     return train, valid
 
 def get_target(path, tag, FOLD):
     col = 'answered_correctly'
-    train,valid = get_train_valid(path, FOLD)
+    _,train,valid = get_train_valid(path, FOLD)
     return train[[col]], valid[[col]]
 
 def run_fe(func, path, tag, FOLD):
