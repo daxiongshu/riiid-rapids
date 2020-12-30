@@ -44,6 +44,8 @@ def run(filename, do_backup, func, *args):
     tag = f'python {filename}'
     print(tag, '...')
     score = func(*args)
+    if score is not None:
+        print(f"score: {score:.4f}")
     duration = time() - start
     if do_backup and score is not None:
         backup(filename, duration, score)
