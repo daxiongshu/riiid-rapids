@@ -83,6 +83,7 @@ def get_train_valid(path, FOLD, drop=True, question=False):
     return base,train,valid
 
 def get_sorted_df(df, cols):
+    print(cols)
     df = df[cols+['idx']]
     df = df.sort_values('idx').drop('idx', axis=1)
     return df
@@ -100,29 +101,28 @@ def default(path, tag, FOLD):
     valid = get_sorted_df(valid, cols)
     return train, valid
 
-def user_order(path, tag, FOLD):
+def prev_y(path, tag, FOLD):
     
-    base,train,valid = get_train_valid(path, FOLD)
+    _,train,valid = get_train_valid(path, FOLD)
     
-    def get_order_in_group(user_id, order):
-        N = len(user_id)
-        for i in range(cuda.threadIdx.x, len(user_id), cuda.blockDim.x):
-            order[i] = i - N
-
-    tmp = gd.concat([base[['user_id','row_id']], train[['user_id','row_id']], valid[['user_id','row_id']]], axis=0)
-    tmp = tmp.groupby('user_id', 
-                          as_index=False).apply_grouped(get_order_in_group,incols=['user_id'],
-                                  outcols={'order': 'int32'},
-                                  tpb=32)
-
-    train = train.merge(tmp[['row_id', 'order']], on='row_id', how='left')
-    valid = valid.merge(tmp[['row_id', 'order']], on='row_id', how='left')
+    tr = gd.read_csv(f'{path}/cache/train_{FOLD}_prev_y.csv')
+    va = gd.read_csv(f'{path}/cache/valid_{FOLD}_prev_y.csv')
     
-    cols = ['order']
+    train = train.merge(tr, on='row_id', how='left')
+    valid = valid.merge(va, on='row_id', how='left')
+    
+    cols = [i for i in tr.columns if i!='row_id']
+    
     train = get_sorted_df(train, cols)
     valid = get_sorted_df(valid, cols)
-    
     return train, valid
+
+def tocsv(path, tag, FOLD):
+    _,train,valid = get_train_valid(path, FOLD)
+    name = f'{path}/cache/train_{FOLD}.csv'
+    train.to_csv(name, index=False)
+    name = f'{path}/cache/valid_{FOLD}.csv'
+    valid.to_csv(name, index=False)
 
 def time_diff(path, tag, FOLD):
     
@@ -261,4 +261,8 @@ def load_feas():
 if __name__ == '__main__':
     func = sys.argv[1]
     path = PATH
-    run_fe(eval(func), path, func, FOLD)
+    if func == 'tocsv':
+        f = eval(func)
+        f(path, func, FOLD)
+    else:
+        run_fe(eval(func), path, func, FOLD)

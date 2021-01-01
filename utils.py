@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from time import time
 from config import DEVICE, BACKUP, LOG, INFO
-
+import sys
 
 def backup(filename, duration, score):
     name = make_name()
@@ -50,3 +50,17 @@ def run(filename, do_backup, func, *args):
     if do_backup and score is not None:
         backup(filename, duration, score)
     print(f'{tag} done! Time:{duration: .1f} seconds')
+
+def parquet2csv(name):
+    import pandas as pd
+    out = name.replace('.parquet', '.csv')
+    if os.path.exists(out):
+        print(out, 'exists')
+        return
+    df = pd.read_parquet(name)
+    print(df.shape, out)
+    df.to_csv(out, index=False)
+
+if __name__ == '__main__':
+    name = sys.argv[1]
+    parquet2csv(name)
