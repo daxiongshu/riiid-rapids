@@ -14,6 +14,8 @@ def backup(filename, duration, score):
     write_log(LOG, name, duration, score, f"{filename} {INFO}")
     cmd = f"cp *.py run.sh run.log {bpath}/"
     os.system(cmd)
+    cmd = f"mv *.pth {bpath}/"
+    os.system(cmd)
     print(f"{bpath} backup done")
 
 def mkdir(bpath):
@@ -44,12 +46,13 @@ def run(filename, do_backup, func, *args):
     tag = f'python {filename}'
     print(tag, '...')
     score = func(*args)
-    if score is not None:
+    if score is not None and type(score) == float:
         print(f"score: {score:.4f}")
     duration = time() - start
     if do_backup and score is not None:
         backup(filename, duration, score)
     print(f'{tag} done! Time:{duration: .1f} seconds')
+    return score
 
 def parquet2csv(name):
     import pandas as pd

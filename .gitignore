@@ -1,5 +1,7 @@
 *.csv
+*.ipynb
 pypy
+*.npy
 *.parquet
 __pycache__
 *.pyc

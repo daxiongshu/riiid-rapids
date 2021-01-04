@@ -13,7 +13,7 @@ def xgb(path):
               'eta': 0.1,
               'early_stopping_rounds': 10,
               'max_depth': 7, 
-              'colsample_bytree': 0.7,
+              'colsample_bytree': 1.0,
               'subsample': 0.5,
               'verbosity': 1,
               'objective': 'binary:logistic',
@@ -28,6 +28,9 @@ def xgb(path):
     yp = clf.predict_proba(Xt)
     #return yp
     print(cols)
+    cp.save('xgb_va.npy', cp.asarray(yp))
+    yx = clf.predict_proba(X)
+    cp.save('xgb_tr.npy', cp.asarray(yx))
     return roc_auc_score(yt, yp)
 
 if __name__ == '__main__':

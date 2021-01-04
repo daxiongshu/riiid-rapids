@@ -1,5 +1,6 @@
 import cudf as gd
 import pandas as pd
+import numpy as np
 import os
 import random
 from numba import cuda
@@ -10,6 +11,7 @@ from tqdm import tqdm
 from config import PATH,FOLD
 import sys
 import glob
+from utils import run
 
 def clean(df, drop=True):
     cols = ['viretual_time_stamp', 'user_answer']
@@ -21,7 +23,7 @@ def clean(df, drop=True):
     for i in df.columns:
         if df[i].dtype == 'bool':
             df[i] = df[i].astype('float32')
-        df[i] = df[i].fillna(-999) 
+        #df[i] = df[i].fillna(-999) 
     df['idx'] = cp.arange(df.shape[0])
     return df
 
@@ -33,6 +35,7 @@ def drop_lecture(df):
 
 def get_x_y(df, bad=[]):
     y = df['answered_correctly'].values.astype('float32')
+    bad = [i for i in bad if i in df.columns]
     df = df.drop(bad+['answered_correctly'], axis=1)
 
     print(df.columns)
@@ -40,9 +43,27 @@ def get_x_y(df, bad=[]):
     #X = cp.ascontiguousarray(X)
     return X, y, df
 
-def get_data():
+def get_data(fillna=None, dropids=True, norm=False):
     train, valid = load_feas()
-    bad = ['timestamp']
+    bad = ['timestamp']# + [i for i in train.columns if i.startswith('time')]# or i.startswith('prior') or i.startswith('count')]
+    if dropids:
+        bad = bad + ['user_id', 'content_id', 'part']
+    ms = {}
+    if norm:
+        for col in train.columns:
+            if col not in ['user_id', 'content_id', 'part', 'answered_correctly']:
+                if train[col].max()>100 and train[col].min()>=0:
+                    print(col, train[col].min(), train[col].max())
+                    train[col] = np.log1p(train[col])
+                    valid[col] = np.log1p(valid[col])
+                    print(col, train[col].min(), train[col].max(), valid[col].min(), valid[col].max())
+                mean,std = train[col].mean(), train[col].std()
+                ms[col] = (mean, std)
+                train[col] = (train[col] - mean)/std
+                valid[col] = (valid[col] - mean)/std
+    if fillna is not None:
+        train = train.fillna(fillna)
+        valid = valid.fillna(fillna)
     X, y, train = get_x_y(train, bad)
     cols1 = train.columns.values.tolist()
     del train
@@ -51,11 +72,13 @@ def get_data():
     del valid
     assert cols1 == cols2
     print(cols1)
+    print(ms)
     return X,y,Xt,yt,cols1
 
 def merge_question(df, dq):
     df = df.merge(dq, left_on='content_id', right_on='question_id', how='left')
     df = df.drop('question_id', axis=1)
+    df = df.sort_values('idx')
     return df
 
 def get_train_valid(path, FOLD, drop=True, question=False):
@@ -88,12 +111,26 @@ def get_sorted_df(df, cols):
     df = df.sort_values('idx').drop('idx', axis=1)
     return df
 
+def ids(path, tag, FOLD):
+    _,train,valid = get_train_valid(path, FOLD, question=True)
+
+    ycol = 'answered_correctly'
+    cols = ['user_id', 'content_id', 'part']
+    print(cols)
+
+    train['user_id'] = train['user_id']%N
+    valid['user_id'] = valid['user_id']%N
+
+    train = get_sorted_df(train, cols)
+    valid = get_sorted_df(valid, cols)
+    return train, valid
+
 def default(path, tag, FOLD):
     
     _,train,valid = get_train_valid(path, FOLD)
     
     ycol = 'answered_correctly'
-    cols = [i for i in train.columns if not i.endswith('_id') and i!=ycol]
+    cols = [i for i in train.columns if not i.endswith('_id') and i not in [ycol,'idx']]
     #cols = [i for i in train.columns if  i!=ycol]
     print(cols)
     
@@ -104,21 +141,23 @@ def default(path, tag, FOLD):
 def prev_y(path, tag, FOLD):
     
     _,train,valid = get_train_valid(path, FOLD)
+    cols = []
+
+    for tag in ['rolling_row']:#,'rolling_row_tags']:
+        tr = gd.read_csv(f'{path}/cache/train_{FOLD}_{tag}.csv')
+        va = gd.read_csv(f'{path}/cache/valid_{FOLD}_{tag}.csv')
     
-    tr = gd.read_csv(f'{path}/cache/train_{FOLD}_prev_y.csv')
-    va = gd.read_csv(f'{path}/cache/valid_{FOLD}_prev_y.csv')
+        train = train.merge(tr, on='row_id', how='left')
+        valid = valid.merge(va, on='row_id', how='left')
     
-    train = train.merge(tr, on='row_id', how='left')
-    valid = valid.merge(va, on='row_id', how='left')
-    
-    cols = [i for i in tr.columns if i!='row_id']
+        cols = cols + [i for i in tr.columns if i!='row_id']
     
     train = get_sorted_df(train, cols)
     valid = get_sorted_df(valid, cols)
     return train, valid
 
 def tocsv(path, tag, FOLD):
-    _,train,valid = get_train_valid(path, FOLD)
+    _,train,valid = get_train_valid(path, FOLD, question=True)
     name = f'{path}/cache/train_{FOLD}.csv'
     train.to_csv(name, index=False)
     name = f'{path}/cache/valid_{FOLD}.csv'
@@ -150,7 +189,10 @@ def time_diff(path, tag, FOLD):
                                   outcols={'time_diff': 'int64',
                                            'time_diff2': 'int64'},
                                   tpb=32)
-    
+    for col in ['time_diff', 'time_diff2']:
+        mask = tr[col] == -1
+        tr.loc[mask, col] = None
+
     tr = tr.drop(['user_id', 'timestamp'], axis=1)
     train = train.merge(tr, on='row_id', how='left')
     
@@ -161,6 +203,10 @@ def time_diff(path, tag, FOLD):
                                   outcols={'time_diff': 'int64',
                                            'time_diff2': 'int64'},
                                   tpb=32)
+    for col in ['time_diff', 'time_diff2']:
+        mask = va[col] == -1
+        va.loc[mask, col] = None
+
     va = va.drop(['user_id', 'timestamp'], axis=1)
     valid = valid.merge(va, on='row_id', how='left')
     
@@ -170,19 +216,15 @@ def time_diff(path, tag, FOLD):
     
     return train, valid
 
-def encode(path, tag, FOLD, func, question=False):
+def encode(path, tag, FOLD, func, cols, question=False):
     
     base,train,valid = get_train_valid(path, FOLD, question=question)
     
     ycol = 'answered_correctly'
-    if question:
-        id_cols = ['bundle_id', 'part']
-    else:
-        id_cols = [i for i in train.columns if i.endswith('_id') and i!='row_id']
-    print('id_cols', id_cols)
+    print('cols', cols)
     tgt = {}
 
-    for i in tqdm(id_cols):
+    for i in tqdm(cols):
         dg = base.groupby(i).agg({ycol:func})
         dg = dg.reset_index()
         dg.columns = [i, f'{tag}_{i}']
@@ -190,17 +232,17 @@ def encode(path, tag, FOLD, func, question=False):
         valid = valid.merge(dg, on=i, how='left')
         dg.to_parquet(f'{path}/cache/{tag}_{i}_{FOLD}.parquet')
     
-    id_cols = [f'{tag}_{i}' for i in id_cols]
-    train = get_sorted_df(train, id_cols)
-    valid = get_sorted_df(valid, id_cols)
+    cols = [f'{tag}_{i}' for i in cols]
+    train = get_sorted_df(train, cols)
+    valid = get_sorted_df(valid, cols)
     
     return train, valid
 
 def count_encode(path, tag, FOLD):
-    return encode(path, tag, FOLD, func='count')
+    return encode(path, tag, FOLD, func='count', cols=['content_id', 'task_container_id'])
 
 def target_encode(path, tag, FOLD):
-    return encode(path, tag, FOLD, func='mean')
+    return encode(path, tag, FOLD, func='mean', cols=['user_id', 'content_id'])
 
 def count_lecture(path, tag, FOLD):
     
@@ -224,7 +266,7 @@ def count_lecture(path, tag, FOLD):
     return train, valid
 
 def question_target_encode(path, tag, FOLD):
-    return encode(path, tag, FOLD, func='mean', question=True)
+    return encode(path, tag, FOLD, func='mean', cols=['part'], question=True)
 
 def question_count_encode(path, tag, FOLD):
     return encode(path, tag, FOLD, func='count', question=True)
@@ -250,7 +292,10 @@ def run_fe(func, path, tag, FOLD):
 def load_feas():
     path = f"{PATH}/cache"
     names = glob.glob(f"{path}/fe_train*")
-    print(names)
+    tname = f"{path}/fe_train_ids_0.parquet"
+    names = [i for i in names if i!=tname] + [i for i in names if i==tname]
+    for i in names:
+        print(i)
     trs = [pd.read_parquet(name) for name in names]
     vas = [pd.read_parquet(name.replace('train', 'valid')) for name in names]
     print([len(i) for i in vas])
@@ -262,7 +307,6 @@ if __name__ == '__main__':
     func = sys.argv[1]
     path = PATH
     if func == 'tocsv':
-        f = eval(func)
-        f(path, func, FOLD)
+        run(__file__, False, tocsv, path, func, FOLD)
     else:
         run_fe(eval(func), path, func, FOLD)
